@@ -12,7 +12,7 @@ const SRC_HTML = path.join(OUT_DIR, 'client', 'index.html');
 const DEST_HTML = path.join(OUT_DIR, 'index.html');
 
 // 網站名稱與描述（可依需求修改）
-const APP_NAME = '多媒體作品集部落格';
+const APP_NAME = '阿進哥在忙什麼?';
 const APP_DESC = '文字、圖片、影片一站式多媒體部落格';
 
 function main() {
