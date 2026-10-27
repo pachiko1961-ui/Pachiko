@@ -83,10 +83,10 @@ const HomePage: React.FC = () => {
           <section className="bg-gradient-to-b from-slate-50 to-white border-b border-slate-200">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 text-center">
               <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-4 font-serif">
-                歡迎來到部落格
+                阿進哥在忙什麼?
               </h1>
               <p className="text-lg text-slate-600 mb-8 max-w-2xl mx-auto leading-relaxed">
-                探索技術、設計與生活的點滴，這裡記錄著關於程式開發、
+                探索技術、設計與生活的點滴，這裡記錄著關於電腦維修、
                 數位創作與日常思考的文章。
               </p>
               <form
