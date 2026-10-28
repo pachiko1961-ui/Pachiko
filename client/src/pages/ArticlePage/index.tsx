@@ -10,6 +10,7 @@ import {
 } from '@client/src/lib/supabase';
 import { Markdown } from '@client/src/components/ui/markdown';
 import { Image } from '@client/src/components/ui/image';
+import { formatDateTime } from '@client/src/lib/utils';
 
 function getYouTubeVideoId(url: string): string | null {
   const patterns = [
@@ -35,13 +36,7 @@ const ArticlePage: React.FC = () => {
 
   const isSetupError = error && isTableNotExistError(error);
 
-  const dateStr = post?.publishedAt
-    ? new Date(post.publishedAt).toLocaleDateString('zh-TW', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      })
-    : '';
+  const dateStr = formatDateTime(post?.publishedAt);
 
   const videoId = post?.youtubeUrl ? getYouTubeVideoId(post.youtubeUrl) : null;
 
