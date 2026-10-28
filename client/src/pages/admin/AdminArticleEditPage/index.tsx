@@ -28,6 +28,8 @@ const AdminArticleEditPage: React.FC = () => {
   const navigate = useNavigate();
   const isEditMode = Boolean(id);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const contentImageInputRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
 
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
@@ -97,6 +99,48 @@ const AdminArticleEditPage: React.FC = () => {
 
   const handleRemoveCover = () => {
     setCoverImage(null);
+  };
+
+  const handleInsertContentImage = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('請上傳圖片檔案');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const url = await uploadImage(file);
+      const ta = contentRef.current;
+      const start = ta ? ta.selectionStart : content.length;
+      const end = ta ? ta.selectionEnd : content.length;
+      const alt = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
+      const insertText = `![${alt}](${url})`;
+      const nextContent =
+        content.slice(0, start) + insertText + content.slice(end);
+      setContent(nextContent);
+      // 插入後將游標移到圖片語法後方
+      setTimeout(() => {
+        if (ta) {
+          ta.focus();
+          ta.setSelectionRange(
+            start + insertText.length,
+            start + insertText.length
+          );
+        }
+      }, 0);
+      toast.success('圖片已插入內文');
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
+    } finally {
+      setIsUploading(false);
+      if (contentImageInputRef.current)
+        contentImageInputRef.current.value = '';
+    }
   };
 
   const toggleTag = (tagId: string) => {
@@ -257,7 +301,26 @@ const AdminArticleEditPage: React.FC = () => {
           {/* Content editor */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-slate-50">
-              <span className="text-sm font-medium text-slate-700">文章內容 (Markdown)</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-slate-700">文章內容 (Markdown)</span>
+                <input
+                  ref={contentImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleInsertContentImage}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => contentImageInputRef.current?.click()}
+                  disabled={isUploading}
+                  title="上傳圖片並插入內文"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-100 disabled:opacity-50 transition-colors"
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  {isUploading ? '上傳中...' : '插入圖片'}
+                </button>
+              </div>
               <div className="flex bg-white rounded-md border border-slate-200 p-0.5">
                 <button
                   onClick={() => setViewMode('edit')}
@@ -292,6 +355,7 @@ const AdminArticleEditPage: React.FC = () => {
               {(viewMode === 'edit' || viewMode === 'split') && (
                 <div className={viewMode === 'split' ? 'border-r border-slate-200' : ''}>
                   <textarea
+                    ref={contentRef}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     placeholder="# 開始寫作...&#10;&#10;支援 Markdown 語法"

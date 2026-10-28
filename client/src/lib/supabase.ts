@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 // 支援 Vercel 環境變數覆寫（VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY），未設定時使用內建預設值

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSupabase, WS_IMAGES_BUCKET, getPublicImageUrl } from './supabase';
+import { upload } from '@vercel/blob/client';
+import { getSupabase } from './supabase';
 import type {
   WsPost, WsCategory, WsTag, PostListParams, PostListResponse,
   CreatePostRequest, UpdatePostRequest,
@@ -441,20 +442,19 @@ export function useDeleteTag() {
 }
 
 export async function uploadImage(file: File): Promise<string> {
-  const supabase = getSupabase();
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
-  const filePath = `blog/${fileName}`;
+  // 過濾檔名中的特殊字元，避免產生物件路徑問題
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+  const filePath = `blog/${Date.now()}-${Math.random()
+    .toString(36)
+    .substring(2, 10)}-${safeName}`;
 
-  const { error } = await supabase.storage
-    .from(WS_IMAGES_BUCKET)
-    .upload(filePath, file, {
-      cacheControl: '3600',
-      upsert: false,
-    });
+  // 透過 Vercel Blob 瀏覽器直傳：先向 /api/upload 取得簽章，再直接上傳
+  const blob = await upload(filePath, file, {
+    access: 'public',
+    handleUploadUrl: '/api/upload',
+  });
 
-  if (error) throw error;
-  return getPublicImageUrl(filePath);
+  return blob.url;
 }
 
 export function slugify(text: string): string {
