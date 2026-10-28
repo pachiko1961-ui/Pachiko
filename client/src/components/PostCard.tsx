@@ -3,19 +3,14 @@ import { Link } from 'react-router-dom';
 import { Calendar, Tag, FolderOpen } from 'lucide-react';
 import type { WsPost } from '@shared/supabase.interface';
 import { Image } from '@client/src/components/ui/image';
+import { formatDate } from '@client/src/lib/utils';
 
 interface PostCardProps {
   post: WsPost;
 }
 
 const PostCard: React.FC<PostCardProps> = ({ post }) => {
-  const dateStr = post.publishedAt
-    ? new Date(post.publishedAt).toLocaleDateString('zh-TW', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      })
-    : '';
+  const dateStr = formatDate(post.publishedAt);
 
   const excerpt = post.content
     ? post.content.replace(/[#*`>\-\[\]]/g, '').substring(0, 120) + '...'
