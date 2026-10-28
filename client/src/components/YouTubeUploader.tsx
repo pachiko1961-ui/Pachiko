@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 declare global {
   interface Window {
@@ -15,7 +15,6 @@ const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
 const SCOPES = 'https://www.googleapis.com/auth/youtube.upload';
 
 export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploaderProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -23,7 +22,7 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
   const [gisLoaded, setGisLoaded] = useState(false);
   const tokenClientRef = useRef<any>(null);
 
-  // 載入 Google Identity Services 官方最新授權庫
+  // 載入 Google Identity Services 最新官方授權庫
   useEffect(() => {
     if (!CLIENT_ID) return;
     if (window.google?.accounts?.oauth2) {
@@ -39,7 +38,7 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
     document.body.appendChild(script);
   }, []);
 
-  // 初始化授權用戶端
+  // 初始化授權客戶端
   useEffect(() => {
     if (!gisLoaded || !CLIENT_ID) return;
 
@@ -61,7 +60,7 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
     });
   }, [gisLoaded]);
 
-  // 第一步：觸發 Google 授權（使用者主動點擊）
+  // 觸發 Google 授權（使用者主動點擊）
   const handleAuthorize = () => {
     setError('');
     if (!tokenClientRef.current) {
@@ -71,11 +70,7 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
     tokenClientRef.current.requestAccessToken();
   };
 
-  // 第二步：選擇影片檔案（使用者主動點擊，符合瀏覽器安全規範）
-  const handleSelectFile = () => {
-    fileInputRef.current?.click();
-  };
-
+  // 選擇檔案後直接上傳（原生觸發，絕對不會報 user activation 錯）
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !accessToken) return;
@@ -91,7 +86,7 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
       setError(err.message || '上傳失敗');
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      e.target.value = '';
     }
   };
 
@@ -159,34 +154,27 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
-        {!accessToken ? (
-          <button
-            type="button"
-            onClick={handleAuthorize}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium"
-          >
-            登入 YouTube 授權
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleSelectFile}
+      {!accessToken ? (
+        <button
+          type="button"
+          onClick={handleAuthorize}
+          className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium"
+        >
+          登入 YouTube 授權
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs text-green-700">✓ YouTube 授權已生效</p>
+          {/* 直接顯示原生檔案選擇框，完全由使用者點擊觸發 */}
+          <input
+            type="file"
+            accept="video/*"
             disabled={uploading}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium disabled:opacity-50"
-          >
-            {uploading ? '上傳中...' : '選擇影片並上傳'}
-          </button>
-        )}
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="video/*"
-        className="hidden"
-        onChange={handleFileChange}
-      />
+            onChange={handleFileChange}
+            className="text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-red-600 file:text-white hover:file:bg-red-700"
+          />
+        </div>
+      )}
 
       {uploading && (
         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -202,10 +190,6 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
         <div className="text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">
           {error}
         </div>
-      )}
-
-      {accessToken && !uploading && (
-        <p className="text-xs text-green-700">✓ YouTube 授權已生效</p>
       )}
     </div>
   );
