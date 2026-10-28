@@ -20,6 +20,7 @@ import {
   type WsTag,
 } from '@shared/supabase.interface';
 import { Image } from '@client/src/components/ui/image';
+import { YouTubeUploader } from '@client/src/components/YouTubeUploader';
 
 type ViewMode = 'edit' | 'preview' | 'split';
 
@@ -483,6 +484,10 @@ const AdminArticleEditPage: React.FC = () => {
               onChange={(e) => setYoutubeUrl(e.target.value)}
               placeholder="https://www.youtube.com/watch?v=..."
               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900/20 focus:border-slate-900"
+            />
+            <YouTubeUploader
+              title={title.trim() || undefined}
+              onUploaded={(url) => setYoutubeUrl(url)}
             />
             {youtubeEmbed && (
               <div className="mt-3 aspect-video rounded-lg overflow-hidden bg-black">
