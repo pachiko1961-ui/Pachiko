@@ -12,6 +12,7 @@ import {
 } from '../../../lib/supabase';
 import SetupAlert from '../../../components/SetupAlert';
 import ErrorAlert from '../../../components/ErrorAlert';
+import { formatDate } from '../../../lib/utils';
 import {
   POST_STATUSES,
   POST_STATUS_LABELS,
@@ -190,9 +191,9 @@ const AdminPostsPage: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-slate-500">
                         {post.publishedAt
-                          ? new Date(post.publishedAt).toISOString().slice(0, 10)
+                          ? formatDate(post.publishedAt)
                           : post.createdAt
-                            ? new Date(post.createdAt).toISOString().slice(0, 10)
+                            ? formatDate(post.createdAt)
                             : '—'}
                       </td>
                       <td className="px-4 py-3">
