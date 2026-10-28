@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 
 declare global {
   interface Window {
-    gapi: any;
     google: any;
   }
 }
@@ -17,90 +16,76 @@ const SCOPES = 'https://www.googleapis.com/auth/youtube.upload';
 
 export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
-  const [gapiLoaded, setGapiLoaded] = useState(false);
+  const [gisLoaded, setGisLoaded] = useState(false);
+  const tokenClientRef = useRef<any>(null);
 
-  // 戴入 Google API 腳本
+  // 載入 Google Identity Services 官方最新授權庫
   useEffect(() => {
     if (!CLIENT_ID) return;
-    if (window.gapi) {
-      setGapiLoaded(true);
+    if (window.google?.accounts?.oauth2) {
+      setGisLoaded(true);
       return;
     }
 
     const script = document.createElement('script');
-    script.src = 'https://apis.google.com/js/api.js';
-    script.onload = () => setGapiLoaded(true);
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setGisLoaded(true);
     document.body.appendChild(script);
-
-    return () => {
-      // 不移除腳本，避免重複載入
-    };
   }, []);
 
-  // 初始化 Google 用戶端並檢查授權狀態
-  const initGapiClient = async () => {
-    if (!window.gapi) throw new Error('Google API 尚未載入');
-    
-    await new Promise<void>((resolve, reject) => {
-      window.gapi.load('client:auth2', {
-        callback: resolve,
-        onerror: reject,
-      });
-    });
+  // 初始化授權用戶端
+  useEffect(() => {
+    if (!gisLoaded || !CLIENT_ID) return;
 
-    await window.gapi.client.init({
-      clientId: CLIENT_ID,
+    tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
       scope: SCOPES,
-      discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/youtube/v3/rest'],
+      callback: (response: any) => {
+        if (response.access_token) {
+          setAccessToken(response.access_token);
+          setError('');
+        } else {
+          setError('授權失敗，請再試一次');
+        }
+      },
+      error_callback: (err: any) => {
+        setError(err.message || '授權過程發生錯誤');
+        console.error('YouTube Auth Error:', err);
+      },
     });
+  }, [gisLoaded]);
 
-    const authInstance = window.gapi.auth2.getAuthInstance();
-    if (authInstance.isSignedIn.get()) {
-      setIsAuthorized(true);
-    }
-  };
-
-  // 第一步：登入授權
-  const handleAuthorize = async () => {
+  // 第一步：觸發 Google 授權（使用者主動點擊）
+  const handleAuthorize = () => {
     setError('');
-    try {
-      if (!gapiLoaded) throw new Error('Google API 載入中，請稍後再試');
-      if (!window.gapi.auth2) {
-        await initGapiClient();
-      }
-
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      const user = await authInstance.signIn();
-      if (user.isSignedIn()) {
-        setIsAuthorized(true);
-      } else {
-        setError('授權失敗，請再試一次');
-      }
-    } catch (err: any) {
-      setError(err.error || err.message || '授權過程發生錯誤');
-      console.error('YouTube Auth Error:', err);
+    if (!tokenClientRef.current) {
+      setError('Google 授權服務載入中，請稍後再試');
+      return;
     }
+    tokenClientRef.current.requestAccessToken();
   };
 
-  // 第二步：選擇檔案並開始上傳
+  // 第二步：選擇影片檔案（使用者主動點擊，符合瀏覽器安全規範）
   const handleSelectFile = () => {
     fileInputRef.current?.click();
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !accessToken) return;
 
     setUploading(true);
     setProgress(0);
     setError('');
 
     try {
-      const videoUrl = await uploadVideo(file);
+      const videoUrl = await uploadVideo(file, accessToken);
       onUploaded(videoUrl);
     } catch (err: any) {
       setError(err.message || '上傳失敗');
@@ -110,8 +95,8 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
     }
   };
 
-  // 執行影片上傳
-  const uploadVideo = (file: File): Promise<string> => {
+  // 直傳 YouTube Data API v3（multipart 上傳）
+  const uploadVideo = (file: File, token: string): Promise<string> => {
     return new Promise((resolve, reject) => {
       const title = videoTitle || file.name.replace(/\.[^/.]+$/, '');
       const metadata = {
@@ -137,10 +122,7 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
         'POST',
         'https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status&uploadType=multipart'
       );
-      xhr.setRequestHeader(
-        'Authorization',
-        `Bearer ${window.gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse().access_token}`
-      );
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
@@ -153,8 +135,12 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
           const response = JSON.parse(xhr.responseText);
           resolve(`https://www.youtube.com/watch?v=${response.id}`);
         } else {
-          const errRes = JSON.parse(xhr.responseText);
-          reject(new Error(errRes.error?.message || '上傳失敗'));
+          try {
+            const errRes = JSON.parse(xhr.responseText);
+            reject(new Error(errRes.error?.message || '上傳失敗'));
+          } catch {
+            reject(new Error(`上傳失敗 (HTTP ${xhr.status})`));
+          }
         }
       };
 
@@ -174,7 +160,7 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
   return (
     <div className="space-y-3">
       <div className="flex gap-2">
-        {!isAuthorized ? (
+        {!accessToken ? (
           <button
             type="button"
             onClick={handleAuthorize}
@@ -218,7 +204,7 @@ export default function YouTubeUploader({ onUploaded, videoTitle }: YouTubeUploa
         </div>
       )}
 
-      {isAuthorized && !uploading && (
+      {accessToken && !uploading && (
         <p className="text-xs text-green-700">✓ YouTube 授權已生效</p>
       )}
     </div>
